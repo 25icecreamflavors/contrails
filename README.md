@@ -2,7 +2,7 @@
 
 ## TODO:
 1. Create a dataset - ✓
-2. Create models
+2. Create models - ✓
 3. Create a training script
 4. Do the train part of the main.py
 5. Create configs
