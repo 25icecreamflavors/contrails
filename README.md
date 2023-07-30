@@ -1,7 +1,7 @@
 # Google Research - Identify Contrails to Reduce Global Warming
 
 ## TODO:
-1. Create dataset
+1. Create a dataset
 2. Create models
 3. Create a training script
 4. Do the train part of the main.py
