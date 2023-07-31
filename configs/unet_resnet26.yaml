@@ -9,37 +9,34 @@ train_folds: [0, 1, 2, 3]
     
 seed: 808
 
-train_bs: 48
+train_bs: 64
 valid_bs: 128
 workers: 1
 
-progress_bar_refresh_rate: 1
+num_epochs: 20
+image_size: 384
+
+save_path: "models_checkpoints/"
+save_strategy: "epoch"
+save_period: 1
 
 early_stop:
     monitor: "val_loss"
-    mode: "min"
     patience: 999
-    verbose: 1
-
-trainer:
-    max_epochs: 20
-    min_epochs: 20
-    enable_progress_bar: True
-    precision: "16-mixed"
-    devices: 2
 
 model:
     seg_model: "Unet"
     encoder_name: "timm-resnest26d"
-    loss_smooth: 1.0
-    image_size: 384
-    optimizer_params:
-        lr: 0.0005
-        weight_decay: 0.0
-    scheduler:
-        name: "cosine_with_hard_restarts_schedule_with_warmup"
-        params:
-            cosine_with_hard_restarts_schedule_with_warmup:
-                num_warmup_steps: 350
-                num_training_steps: 3150
-                num_cycles: 1
+    loss_smooth: 1e-7
+
+optimizer_params:
+    lr: 0.0005
+    weight_decay: 0.0
+
+scheduler:
+    name: "cosine_with_hard_restarts_schedule_with_warmup"
+    params:
+        cosine_with_hard_restarts_schedule_with_warmup:
+            num_warmup_steps: 350
+            num_training_steps: 3150
+            num_cycles: 1

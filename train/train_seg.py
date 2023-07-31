@@ -1,8 +1,6 @@
 import os
 
 import torch
-import torch.optim as optim
-import torch.utils.data as data
 from tqdm import tqdm
 
 
@@ -18,6 +16,7 @@ def train_model(
 ):
     # Get params from the config
     num_epochs = config["num_epochs"]
+    image_size = config["image_size"]
     save_path = config["save_path"]
     save_strategy = config["save_strategy"]
     if save_strategy == "epoch":
@@ -25,6 +24,8 @@ def train_model(
 
     model.to(device)
     best_val_loss = 100
+    # Initialize model_path variable for saving the best model
+    model_path = ""
 
     for epoch in range(num_epochs):
         model.train()
@@ -56,7 +57,6 @@ def train_model(
         # Validation epoch
         model.eval()
         val_loss = 0.0
-
         with torch.no_grad():
             for images, labels in tqdm(val_loader, desc=f"Validation"):
                 images, labels = images.to(device), labels.to(device)
@@ -70,13 +70,15 @@ def train_model(
 
         val_loss /= len(val_loader)
 
+        # Print epoch scores
         print(
             f"Epoch {epoch + 1}/{num_epochs}, \
-            Train Loss: {train_loss / len(train_loader)}, \
-            Validation Loss: {val_loss}"
+            Train Dice Loss: {train_loss / len(train_loader)}, \
+            Validation Dice Loss: {val_loss}"
         )
 
-        # Save model checkpoint based on the chosen save_strategy and save_period
+        # Save model checkpoint based on the chosen save_strategy and
+        # save_period
         # Saving each _th epoch
         if save_strategy == "epoch":
             if (epoch + 1) % save_period == 0:
