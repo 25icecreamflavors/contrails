@@ -155,6 +155,7 @@ def main(args):
                 criterion=dice_loss,
                 optimizer=optimizer,
                 config=config,
+                fold=fold,
                 scheduler=None,
             )
 

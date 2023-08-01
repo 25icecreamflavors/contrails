@@ -13,6 +13,7 @@ def train_model(
     criterion,
     optimizer,
     config,
+    fold=0,
     scheduler=None,
     device="cuda",
 ):
@@ -27,15 +28,18 @@ def train_model(
     # Set up wandb logging
     run = wandb.init(
         # Set the project where this run will be logged
-        project=(
+        project="contrails",
+        # Set up the run name
+        name=(
             f"{config['name']}_lr{config['optimizer_params']['lr']}_"
-            f"epochs{num_epochs}_image_size_{image_size}"
+            f"fold_{fold}_epochs{num_epochs}_image_size_{image_size}"
         ),
         # Track hyperparameters and run metadata
         config={
             "learning_rate": config["optimizer_params"]["lr"],
             "epochs": num_epochs,
             "image_size": image_size,
+            "fold": fold,
         },
     )
 
@@ -126,7 +130,8 @@ def train_model(
         logging.info(
             f"Epoch {epoch + 1}/{num_epochs} completed, \
             Train Dice Loss: {train_loss}, \
-            Validation Dice Loss: {val_loss}"
+            Validation Dice Loss: {val_loss} \
+            Fold number: {fold}"
         )
         wandb.log(
             {
@@ -142,7 +147,8 @@ def train_model(
         if save_strategy == "epoch":
             if (epoch + 1) % save_period == 0:
                 model_epoch_path = os.path.join(
-                    save_path, f"model_{config['name']}_epoch_{epoch + 1}.pth"
+                    save_path,
+                    f"model_{config['name']}_fold_{fold}_epoch_{epoch + 1}.pth",
                 )
                 torch.save(model.state_dict(), model_epoch_path)
                 logging.info("Saved the new model.")
@@ -153,7 +159,10 @@ def train_model(
                 best_val_loss = val_loss
                 model_epoch_path = os.path.join(
                     save_path,
-                    f"best_model_{config['name']}_epoch_{epoch + 1}.pth",
+                    (
+                        f"best_model_{config['name']}_"
+                        f"fold_{fold}_epoch_{epoch + 1}.pth"
+                    ),
                 )
                 torch.save(model.state_dict(), model_epoch_path)
                 logging.info("Saved the new best model.")
