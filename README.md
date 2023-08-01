@@ -3,7 +3,9 @@
 ## TODO:
 1. Create a dataset - ✓
 2. Create models - ✓
-3. Create a training script
-4. Do the train part of the main.py
-5. Create configs
-5. Write the inference part of the main.py
+3. Create a training script - ✓
+4. Add wandb to the train.py - 
+4. Create configs and read them
+5. Create validation in main.py
+6. Do the train part of the main.py
+7. Write the inference part of the main.py
