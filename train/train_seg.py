@@ -3,6 +3,7 @@ import os
 
 import torch
 from tqdm import tqdm
+import wandb
 
 
 def train_model(
@@ -22,6 +23,21 @@ def train_model(
     save_strategy = config["save_strategy"]
     if save_strategy == "epoch":
         save_period = config["save_period"]
+
+    # Set up wandb logging
+    run = wandb.init(
+        # Set the project where this run will be logged
+        project=(
+            f"{config['name']}_lr{config['optimizer_params']['lr']}_"
+            f"epochs{num_epochs}_image_size_{image_size}"
+        ),
+        # Track hyperparameters and run metadata
+        config={
+            "learning_rate": config["optimizer_params"]["lr"],
+            "epochs": num_epochs,
+            "image_size": image_size,
+        },
+    )
 
     # Send model to GPU, set up validation score
     model.to(device)
@@ -99,17 +115,25 @@ def train_model(
                 val_batch_progress.update(1)
 
         val_loss /= len(val_loader)
+        train_loss /= len(train_loader)
 
         # Update validation progress bar with average dice loss
         val_progress.set_postfix({"Validation Dice Loss": val_loss})
         val_progress.update(1)
         val_batch_progress.close()
 
-        # Log epoch scores
+        # Log epoch scores (logger and wandb)
         logging.info(
             f"Epoch {epoch + 1}/{num_epochs} completed, \
-            Train Dice Loss: {train_loss / len(train_loader)}, \
+            Train Dice Loss: {train_loss}, \
             Validation Dice Loss: {val_loss}"
+        )
+        wandb.log(
+            {
+                "Epoch": epoch,
+                "Train Dice Loss": train_loss,
+                "Validation Dice Loss": val_loss,
+            }
         )
 
         # Save model checkpoint based on the chosen save_strategy and
@@ -118,7 +142,7 @@ def train_model(
         if save_strategy == "epoch":
             if (epoch + 1) % save_period == 0:
                 model_epoch_path = os.path.join(
-                    save_path, f"model_epoch_{epoch + 1}.pth"
+                    save_path, f"model_{config['name']}_epoch_{epoch + 1}.pth"
                 )
                 torch.save(model.state_dict(), model_epoch_path)
                 logging.info("Saved the new model.")
@@ -128,7 +152,8 @@ def train_model(
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 model_epoch_path = os.path.join(
-                    save_path, f"best_model_epoch_{epoch + 1}.pth"
+                    save_path,
+                    f"best_model_{config['name']}_epoch_{epoch + 1}.pth",
                 )
                 torch.save(model.state_dict(), model_epoch_path)
                 logging.info("Saved the new best model.")
