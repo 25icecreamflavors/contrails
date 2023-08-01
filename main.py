@@ -2,6 +2,7 @@ import argparse
 import gc
 import logging
 import os
+import random
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,18 @@ from torch.utils.data import DataLoader
 from dataset.dataset import ContrailsDataset
 from models.segment_model import SegModel
 from train.train_seg import train_model
+
+
+def SeedEverything(seed=808):
+    """Method to seed everything."""
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def read_config(file_path):
@@ -60,6 +73,10 @@ def main(args):
     # Set up logging messages
     setup_logging()
     logging.info("Started the program.")
+
+    # Enable garbage collector and seed everything
+    gc.enable()
+    SeedEverything(config["seed"])
 
     # Run the train part
     if mode == "train":
