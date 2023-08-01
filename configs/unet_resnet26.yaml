@@ -1,6 +1,8 @@
 data_path: "data/"
 output_dir: "models_checkpoints/"
 
+name: "unet_resnet26"
+
 folds:
     n_splits: 4
     random_state: 808
@@ -27,7 +29,8 @@ early_stop:
 model:
     seg_model: "Unet"
     encoder_name: "timm-resnest26d"
-    loss_smooth: 1e-7
+
+loss_smooth: 1e-7
 
 optimizer_params:
     lr: 0.0005
