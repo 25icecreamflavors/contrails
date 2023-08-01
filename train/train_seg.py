@@ -1,3 +1,4 @@
+import logging
 import os
 
 import torch
@@ -27,14 +28,21 @@ def train_model(
     # Initialize model_path variable for saving the best model
     model_path = ""
 
+    # Create progress bars for training and validation
+    train_progress = tqdm(total=num_epochs, desc="Training")
+    val_progress = tqdm(total=num_epochs, desc="Validation")
+
+    logging.info("Starting model training!")
+
     for epoch in range(num_epochs):
         model.train()
         train_loss = 0.0
 
         # Train epoch
-        for images, labels in tqdm(
+        train_batch_progress = tqdm(
             train_loader, desc=f"Epoch {epoch + 1}/{num_epochs}"
-        ):
+        )
+        for batch_idx, (images, labels) in enumerate(train_batch_progress):
             images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
 
@@ -50,6 +58,19 @@ def train_model(
 
             train_loss += loss.item()
 
+            # Update training batch progress bar with dice loss
+            train_batch_progress.set_postfix(
+                {"Train Dice Loss": train_loss / (batch_idx + 1)}
+            )
+            train_batch_progress.update(1)
+
+        # Update training epoch progress bar with average dice loss
+        train_progress.set_postfix(
+            {"Train Dice Loss": train_loss / len(train_loader)}
+        )
+        train_progress.update(1)
+        train_batch_progress.close()
+
         # Scheduler step, if it exists
         if scheduler is not None:
             scheduler.step()
@@ -58,7 +79,8 @@ def train_model(
         model.eval()
         val_loss = 0.0
         with torch.no_grad():
-            for images, labels in tqdm(val_loader, desc=f"Validation"):
+            val_batch_progress = tqdm(val_loader, desc="Validation")
+            for batch_idx, (images, labels) in enumerate(val_batch_progress):
                 images, labels = images.to(device), labels.to(device)
                 outputs = model(images)
                 if image_size != 256:
@@ -68,11 +90,22 @@ def train_model(
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()
 
+                # Update validation batch progress bar with dice loss
+                val_batch_progress.set_postfix(
+                    {"Validation Dice Loss": val_loss / (batch_idx + 1)}
+                )
+                val_batch_progress.update(1)
+
         val_loss /= len(val_loader)
 
-        # Print epoch scores
-        print(
-            f"Epoch {epoch + 1}/{num_epochs}, \
+        # Update validation progress bar with average dice loss
+        val_progress.set_postfix({"Validation Dice Loss": val_loss})
+        val_progress.update(1)
+        val_batch_progress.close()
+
+        # Log epoch scores
+        logging.info(
+            f"Epoch {epoch + 1}/{num_epochs} completed, \
             Train Dice Loss: {train_loss / len(train_loader)}, \
             Validation Dice Loss: {val_loss}"
         )
@@ -86,6 +119,7 @@ def train_model(
                     save_path, f"model_epoch_{epoch + 1}.pth"
                 )
                 torch.save(model.state_dict(), model_epoch_path)
+                logging.info("Saved the new model.")
 
         # Saving the best model only
         else:
@@ -95,10 +129,11 @@ def train_model(
                     save_path, f"best_model_epoch_{epoch + 1}.pth"
                 )
                 torch.save(model.state_dict(), model_epoch_path)
+                logging.info("Saved the new best model.")
 
                 # Delete the previous best model
                 if os.path.exists(model_path):
                     os.remove(model_path)
                 model_path = model_epoch_path
 
-    print("Training complete!")
+    logging.info("Training complete!")
