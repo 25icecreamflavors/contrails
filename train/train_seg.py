@@ -23,8 +23,10 @@ def train_model(
     if save_strategy == "epoch":
         save_period = config["save_period"]
 
+    # Send model to GPU, set up validation score
     model.to(device)
     best_val_loss = 100
+
     # Initialize model_path variable for saving the best model
     model_path = ""
 
