@@ -1,11 +1,20 @@
 import argparse
+import gc
 import logging
+import os
 
 import numpy as np
+import pandas as pd
 import segmentation_models_pytorch as smp
 import torch
 import torch.nn as nn
 import yaml
+from sklearn.model_selection import KFold
+from torch.utils.data import DataLoader
+
+from dataset.dataset import ContrailsDataset
+from models.segment_model import SegModel
+from train.train_seg import train_model
 
 
 def read_config(file_path):
@@ -50,20 +59,98 @@ def main(args):
 
     # Set up logging messages
     setup_logging()
-    logging.info("Started.")
+    logging.info("Started the program.")
 
     # Run the train part
     if mode == "train":
-        # Instantiate the DiceLoss
-        dice_loss = smp.losses.DiceLoss(
-            mode="binary", from_logits=True, smooth=config["loss_smooth"]
+        # Get data paths
+        contrails = os.path.join(config["data_path"], "contrails/")
+        train_path = os.path.join(config["data_path"], "train_df.csv")
+        valid_path = os.path.join(config["data_path"], "valid_df.csv")
+
+        # Read dataframes with contrails id
+        train_df = pd.read_csv(train_path)
+        valid_df = pd.read_csv(valid_path)
+
+        # Add contrails paths to dataframes and concatenate them
+        train_df["path"] = (
+            contrails + train_df["record_id"].astype(str) + ".npy"
         )
+        valid_df["path"] = (
+            contrails + valid_df["record_id"].astype(str) + ".npy"
+        )
+        df = pd.concat([train_df, valid_df]).reset_index()
+
+        # Get data folds for train and validation
+        Fold = KFold(
+            shuffle=True,
+            n_splits=config["folds"]["n_splits"],
+            random_state=config["folds"]["random_state"],
+        )
+        # Add folds column to the dataframe
+        for n, (trn_index, val_index) in enumerate(Fold.split(df)):
+            df.loc[val_index, "kfold"] = int(n)
+        df["kfold"] = df["kfold"].astype(int)
+
+        # Train on the selected folds
+        for fold in config["train_folds"]:
+            logging.info(f"Started training on - Fold {fold}")
+            train_df = df[df.kfold != fold].reset_index(drop=True)
+            valid_df = df[df.kfold == fold].reset_index(drop=True)
+
+            # Create an instance of the ContrailsDataset class
+            train_dataset = ContrailsDataset(
+                train_df, image_size=256, train=True
+            )
+            valid_dataset = ContrailsDataset(
+                valid_df, image_size=256, train=False
+            )
+            # Get dataloaders
+            train_dataloader = DataLoader(
+                train_dataset,
+                batch_size=config["train_bs"],
+                shuffle=True,
+                num_workers=config["num_workers"],
+            )
+            valid_dataloader = DataLoader(
+                valid_dataset,
+                batch_size=config["valid_bs"],
+                shuffle=False,
+                num_workers=config["num_workers"],
+            )
+
+            # Instantiate the SegModel and optimizer
+            model = SegModel(config)
+            optimizer = torch.optim.Adam(
+                model.parameters(), lr=config["optimizer_params"]["lr"]
+            )
+
+            # Instantiate the DiceLoss
+            dice_loss = smp.losses.DiceLoss(
+                mode="binary", from_logits=True, smooth=config["loss_smooth"]
+            )
+
+            # Train the model
+            train_model(
+                model,
+                train_dataloader,
+                valid_dataloader,
+                criterion=dice_loss,
+                optimizer=optimizer,
+                config=config,
+                scheduler=None,
+            )
+
+            # Clear GPU memory
+            del model
+            torch.cuda.empty_cache()
+            gc.collect()
 
     # Run the inference part
     elif mode == "inference":
         pass
 
-    logging.info("Finished.")
+    logging.info("Finished the program.")
 
 
 if __name__ == "__main__":

@@ -3,6 +3,8 @@ output_dir: "models_checkpoints/"
 
 name: "unet_resnet26"
 
+device: "cuda"
+
 folds:
     n_splits: 4
     random_state: 808
