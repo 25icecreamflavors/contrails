@@ -17,16 +17,30 @@ def train_model(
     scheduler=None,
     device="cuda",
 ):
+    """Train method.
+
+    Args:
+        model (_type_): pass model for training
+        train_loader (_type_): as it sais
+        val_loader (_type_): same
+        criterion (_type_): pass the loss function
+        optimizer (_type_): pass optimizer like Adam
+        config (_type_): pass the main config with params
+        fold (int, optional): validation fold number. Defaults to 0.
+        scheduler (_type_, optional): lr scheduler. Defaults to None.
+        device (str, optional): GPU or CPU name. Defaults to "cuda".
+    """
+
     # Get params from the config
     num_epochs = config["num_epochs"]
     image_size = config["image_size"]
-    save_path = config["save_path"]
+    save_path = config["save_path"] + config["name"]
     save_strategy = config["save_strategy"]
     if save_strategy == "epoch":
         save_period = config["save_period"]
 
     # Set up wandb logging
-    run = wandb.init(
+    wandb.init(
         # Set the project where this run will be logged
         project="contrails",
         # Set up the run name
@@ -48,6 +62,7 @@ def train_model(
     best_val_loss = 100
 
     # Initialize model_path variable for saving the best model
+    # Will be used to delete older models
     model_path = ""
 
     # Create progress bars for training and validation
@@ -128,10 +143,15 @@ def train_model(
 
         # Log epoch scores (logger and wandb)
         logging.info(
-            f"Epoch {epoch + 1}/{num_epochs} completed, \
-            Train Dice Loss: {train_loss}, \
-            Validation Dice Loss: {val_loss} \
-            Fold number: {fold}"
+            "Epoch %s/%s completed, "
+            "Train Dice Loss: %s, "
+            "Validation Dice Loss: %s "
+            "Fold number: %s",
+            epoch + 1,
+            num_epochs,
+            train_loss,
+            val_loss,
+            fold,
         )
         wandb.log(
             {
@@ -146,9 +166,17 @@ def train_model(
         # Saving each _th epoch
         if save_strategy == "epoch":
             if (epoch + 1) % save_period == 0:
+                model_name = (
+                    f"model_{config['name']}_fold_{fold}_"
+                    f"epoch_{epoch + 1}_val_loss_{val_loss:.3f}.pth"
+                )
+                # Check, if the directory exists
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+                # Get full model path and save the model
                 model_epoch_path = os.path.join(
                     save_path,
-                    f"model_{config['name']}_fold_{fold}_epoch_{epoch + 1}.pth",
+                    model_name,
                 )
                 torch.save(model.state_dict(), model_epoch_path)
                 logging.info("Saved the new model.")
@@ -157,12 +185,17 @@ def train_model(
         else:
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
+                # Check, if the directory exists
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                model_name = (
+                    f"best_model_{config['name']}_"
+                    f"fold_{fold}_epoch_{epoch + 1}_val_loss_{val_loss:.3f}.pth"
+                )
+
+                # Get full model path and save the model
                 model_epoch_path = os.path.join(
                     save_path,
-                    (
-                        f"best_model_{config['name']}_"
-                        f"fold_{fold}_epoch_{epoch + 1}.pth"
-                    ),
+                    model_name,
                 )
                 torch.save(model.state_dict(), model_epoch_path)
                 logging.info("Saved the new best model.")
