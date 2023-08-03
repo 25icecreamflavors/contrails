@@ -8,9 +8,10 @@ import numpy as np
 import pandas as pd
 import segmentation_models_pytorch as smp
 import torch
-import torch.nn as nn
 import yaml
 from sklearn.model_selection import KFold
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from dataset.dataset import ContrailsDataset
@@ -105,13 +106,13 @@ def main(args):
             random_state=config["folds"]["random_state"],
         )
         # Add folds column to the dataframe
-        for n, (trn_index, val_index) in enumerate(Fold.split(df)):
-            df.loc[val_index, "kfold"] = int(n)
+        for fold_number, (trn_index, val_index) in enumerate(Fold.split(df)):
+            df.loc[val_index, "kfold"] = int(fold_number)
         df["kfold"] = df["kfold"].astype(int)
 
         # Train on the selected folds
         for fold in config["train_folds"]:
-            logging.info(f"Started training on - Fold {fold}")
+            logging.info("Started training on - Fold %s", fold)
             train_df = df[df.kfold != fold].reset_index(drop=True)
             valid_df = df[df.kfold == fold].reset_index(drop=True)
 
@@ -142,6 +143,9 @@ def main(args):
                 model.parameters(), lr=config["optimizer_params"]["lr"]
             )
 
+            # Create a CosineAnnealingLR scheduler
+            scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
+
             # Instantiate the DiceLoss
             dice_loss = smp.losses.DiceLoss(
                 mode="binary", from_logits=True, smooth=config["loss_smooth"]
@@ -156,7 +160,7 @@ def main(args):
                 optimizer=optimizer,
                 config=config,
                 fold=fold,
-                scheduler=None,
+                scheduler=scheduler,
             )
 
             # Clear GPU memory
