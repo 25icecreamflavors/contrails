@@ -44,14 +44,16 @@ def read_config(file_path):
     return config
 
 
-def setup_logging():
+def setup_logging(say_my_name="debug"):
     """Set up logger."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s]: %(message)s",
         handlers=[
             logging.StreamHandler(),  # Output log messages to console
-            logging.FileHandler("somelogs.log"),  # Save log messages to a file
+            logging.FileHandler(
+                f"logs/{say_my_name}.log"
+            ),  # Save log messages to a file
         ],
     )
 
@@ -71,7 +73,7 @@ def main(args):
     config = read_config(config_file)
 
     # Set up logging messages
-    setup_logging()
+    setup_logging(config["name"])
     logging.info("Started the program.")
 
     # Enable garbage collector and seed everything
