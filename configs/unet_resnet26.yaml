@@ -8,6 +8,7 @@ device: "cuda"
 folds:
     n_splits: 4
     random_state: 808
+    bins: 20
 
 train_folds: [0, 1, 2, 3]
     

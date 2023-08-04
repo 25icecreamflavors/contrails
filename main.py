@@ -9,7 +9,7 @@ import pandas as pd
 import segmentation_models_pytorch as smp
 import torch
 import yaml
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, StratifiedKFold
 from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
@@ -107,15 +107,51 @@ def main(args):
             ).reset_index()
 
         # Get data folds for train and validation
-        Fold = KFold(
-            shuffle=True,
-            n_splits=config["folds"]["n_splits"],
-            random_state=config["folds"]["random_state"],
-        )
-        # Add folds column to the dataframe
-        for fold_number, (trn_index, val_index) in enumerate(Fold.split(df)):
-            df.loc[val_index, "kfold"] = int(fold_number)
-        df["kfold"] = df["kfold"].astype(int)
+        # If the random splitting is chosen
+        if config["fold_strategy"] == "random":
+            Fold = KFold(
+                shuffle=True,
+                n_splits=config["folds"]["n_splits"],
+                random_state=config["folds"]["random_state"],
+            )
+            # Add folds column to the dataframe
+            for fold_number, (trn_index, val_index) in enumerate(
+                Fold.split(df)
+            ):
+                df.loc[val_index, "kfold"] = int(fold_number)
+            df["kfold"] = df["kfold"].astype(int)
+
+        # If the splitting is based in the masks sizes
+        else:
+            df["kfold"] = -1
+
+            # Initialize StratifiedKFold
+            skf = StratifiedKFold(
+                n_splits=config["folds"]["n_splits"],
+                shuffle=True,
+                random_state=config["folds"]["random_state"],
+            )
+            # Create a temporary "mask_size_bin" column to handle bins
+            # for non-zero sizes
+            df["mask_size_bin"] = pd.qcut(
+                df[df["mask_size"] > 0]["mask_size"],
+                q=config["folds"]["bins"] - 1,
+                labels=False,
+            )
+            # Assign a unique bin for zero-size masks
+            df.loc[df["mask_size"] == 0, "mask_size_bin"] = -1
+
+            # Stratify based on the "mask_size_bin" column and
+            # assign fold indices
+            for fold_number, (train_index, val_index) in enumerate(
+                skf.split(df, df["mask_size_bin"])
+            ):
+                df.loc[val_index, "kfold"] = int(fold_number)
+
+            # Drop the temporary "mask_size_bin" column
+            df.drop(columns=["mask_size_bin"], inplace=True)
+            # Convert the fold column to integer
+            df["kfold"] = df["kfold"].astype(int)
 
         # Train on the selected folds
         for fold in config["train_folds"]:
