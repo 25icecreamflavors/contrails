@@ -8,7 +8,45 @@ from models.segment_model import SegModel
 from train.train_seg import train_model
 
 from utils.setup import read_config, setup_logging, seed_everything
-from utils.data import get_dataframes, get_folds, get_fold_dataloaders
+from utils.data import (
+    get_dataframes,
+    get_folds,
+    get_fold_dataloaders,
+    get_synthetic_dataloader,
+    get_bgs_list,
+)
+
+
+def train(config, model, train_dataloader, valid_dataloader, fold, num_epochs=None):
+    if num_epochs is None:
+        num_epochs = config["num_epochs"]
+
+    # Instantiate the SegModel and optimizer
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=config["optimizer_params"]["lr"]
+    )
+
+    # Create a CosineAnnealingLR scheduler
+    scheduler = CosineAnnealingLR(optimizer, T_max=config["num_epochs"])
+
+    # Instantiate the DiceLoss
+    dice_loss = smp.losses.DiceLoss(
+        mode="binary", from_logits=True, smooth=config["loss_smooth"]
+    )
+
+    # Train the model
+    model = train_model(
+        model,
+        train_dataloader,
+        valid_dataloader,
+        criterion=dice_loss,
+        optimizer=optimizer,
+        config=config,
+        fold=fold,
+        scheduler=scheduler,
+        num_epochs=num_epochs,
+    )
+    return model
 
 
 def main(args):
@@ -48,35 +86,25 @@ def main(args):
 
             # Get train and validation dataloaders
             train_dataloader, valid_dataloader = get_fold_dataloaders(config, df, fold)
-
-            # Instantiate the SegModel and optimizer
             model = SegModel(config)
-            optimizer = torch.optim.Adam(
-                model.parameters(), lr=config["optimizer_params"]["lr"]
-            )
 
-            # Create a CosineAnnealingLR scheduler
-            scheduler = CosineAnnealingLR(optimizer, T_max=config["num_epochs"])
+            if config["synthetic"]["enable"]:
+                bgs_list = get_bgs_list("./bgs/")
+                synthetic_dataloader = get_synthetic_dataloader(config, bgs_list[:-500])
+                synthetic_val_dataloader = get_synthetic_dataloader(
+                    config, bgs_list[500:]
+                )
 
-            # Instantiate the DiceLoss
-            dice_loss = smp.losses.DiceLoss(
-                mode="binary", from_logits=True, smooth=config["loss_smooth"]
-            )
+                model = train(
+                    config,
+                    model,
+                    synthetic_dataloader,
+                    synthetic_val_dataloader,
+                    -fold,
+                    num_epochs=config["synthetic"]["num_epochs"],
+                )
 
-            # Train the model
-            train_model(
-                model,
-                train_dataloader,
-                valid_dataloader,
-                criterion=dice_loss,
-                optimizer=optimizer,
-                config=config,
-                fold=fold,
-                scheduler=scheduler,
-            )
-
-            # Clear GPU memory
-            del model
+            train(config, model, train_dataloader, valid_dataloader, fold)
             torch.cuda.empty_cache()
             gc.collect()
 

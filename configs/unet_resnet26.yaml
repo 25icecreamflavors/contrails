@@ -32,6 +32,10 @@ early_stop:
     monitor: "val_loss"
     patience: 999
 
+synthetic:
+    enable: True
+    num_epochs: 20
+
 seg_model: "Unet"
 encoder_name: "timm-efficientnet-b0"
 

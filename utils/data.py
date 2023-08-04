@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.model_selection import KFold, StratifiedKFold
 
 from torch.utils.data import DataLoader
-from dataset.dataset import ContrailsDataset
+from dataset.dataset import ContrailsDataset, SyntheticContrailsDataset
 
 
 def get_dataframes(config):
@@ -102,3 +102,24 @@ def get_fold_dataloaders(config, df, fold):
     )
 
     return train_dataloader, valid_dataloader
+
+
+def get_synthetic_dataloader(config, bgs_list):
+    train_dataset = SyntheticContrailsDataset(bgs_list)
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=config["train_bs"],
+        shuffle=True,
+        num_workers=config["num_workers"],
+    )
+
+    return train_dataloader
+
+
+def get_bgs_list(path_dir, extension=".jpg"):
+    bgs_list = []
+    for path_file in os.listdir(path_dir):
+        if path_file.endswith(extension):
+            bgs_list.append(os.path.join(path_dir, path_file))
+    bgs_list = sorted(bgs_list)
+    return bgs_list

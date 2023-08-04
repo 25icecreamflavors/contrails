@@ -16,6 +16,7 @@ def train_model(
     fold=0,
     scheduler=None,
     device="cuda",
+    num_epochs=None,
 ):
     """Train method.
 
@@ -29,10 +30,12 @@ def train_model(
         fold (int, optional): validation fold number. Defaults to 0.
         scheduler (_type_, optional): lr scheduler. Defaults to None.
         device (str, optional): GPU or CPU name. Defaults to "cuda".
+        num_epochs (int, optional): number of epochs to train. Defaults to None.
     """
 
     # Get params from the config
-    num_epochs = config["num_epochs"]
+    if num_epochs is None:
+        num_epochs = config["num_epochs"]
     image_size = config["image_size"]
     save_path = config["save_path"] + config["name"]
     save_strategy = config["save_strategy"]
@@ -109,9 +112,7 @@ def train_model(
             train_batch_progress.update(1)
 
         # Update training epoch progress bar with average dice loss
-        train_progress.set_postfix(
-            {"Train Dice Loss": train_loss / len(train_loader)}
-        )
+        train_progress.set_postfix({"Train Dice Loss": train_loss / len(train_loader)})
         train_progress.update(1)
         train_batch_progress.close()
 
@@ -211,3 +212,4 @@ def train_model(
 
     wandb.finish()
     logging.info("Training complete!")
+    return model
