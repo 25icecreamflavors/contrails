@@ -105,7 +105,10 @@ def get_fold_dataloaders(config, df, fold):
 
 
 def get_synthetic_dataloader(config, bgs_list):
-    train_dataset = SyntheticContrailsDataset(bgs_list)
+    train_dataset = SyntheticContrailsDataset(
+        bgs_list,
+        img_size=config["image_size"],
+    )
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=config["train_bs"],
