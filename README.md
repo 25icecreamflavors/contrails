@@ -2,8 +2,8 @@
 
 ## TODO:
 1. Add file to download models - ✓
-2. Add masks sizes column to the df
-3. Stratify validation by masks sizes
+2. Add masks sizes column to the df - ✓
+3. Stratify validation by masks sizes - ✓
 4. Add an option to choose the scheduler
 5. Write the inference part of the main.py
 
