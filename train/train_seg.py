@@ -39,10 +39,17 @@ def train_model(
     if save_strategy == "epoch":
         save_period = config["save_period"]
 
+    # Check, if the models storage directory exists
+    os.makedirs(save_path, exist_ok=True)
+
     # Set up wandb logging
+    if config["debug"] == 1:
+        project_name = "debug_contrails"
+    else:
+        project_name = "contrails"
     wandb.init(
         # Set the project where this run will be logged
-        project="contrails",
+        project=project_name,
         # Set up the run name
         name=(
             f"{config['name']}_lr{config['optimizer_params']['lr']}_"
@@ -170,8 +177,6 @@ def train_model(
                     f"model_{config['name']}_fold_{fold}_"
                     f"epoch_{epoch + 1}_val_loss_{val_loss:.3f}.pth"
                 )
-                # Check, if the directory exists
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
                 # Get full model path and save the model
                 model_epoch_path = os.path.join(
@@ -185,8 +190,7 @@ def train_model(
         else:
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                # Check, if the directory exists
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
                 model_name = (
                     f"best_model_{config['name']}_"
                     f"fold_{fold}_epoch_{epoch + 1}_val_loss_{val_loss:.3f}.pth"

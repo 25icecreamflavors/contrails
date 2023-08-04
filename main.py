@@ -99,6 +99,9 @@ def main(args):
         )
         df = pd.concat([train_df, valid_df]).reset_index()
 
+        if config["debug"] == 1:
+            df = df.sample(frac=0.05, random_state=config["seed"])
+
         # Get data folds for train and validation
         Fold = KFold(
             shuffle=True,
@@ -118,10 +121,10 @@ def main(args):
 
             # Create an instance of the ContrailsDataset class
             train_dataset = ContrailsDataset(
-                train_df, image_size=256, train=True
+                train_df, image_size=config["image_size"], train=True
             )
             valid_dataset = ContrailsDataset(
-                valid_df, image_size=256, train=False
+                valid_df, image_size=config["image_size"], train=False
             )
             # Get dataloaders
             train_dataloader = DataLoader(
@@ -144,7 +147,7 @@ def main(args):
             )
 
             # Create a CosineAnnealingLR scheduler
-            scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
+            scheduler = CosineAnnealingLR(optimizer, T_max=config["num_epochs"])
 
             # Instantiate the DiceLoss
             dice_loss = smp.losses.DiceLoss(
