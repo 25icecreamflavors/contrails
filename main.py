@@ -104,7 +104,7 @@ def main(args):
         if config["debug"] == 1:
             df = df.sample(
                 frac=0.05, random_state=config["seed"], replace=False
-            )
+            ).reset_index()
 
         # Get data folds for train and validation
         Fold = KFold(
