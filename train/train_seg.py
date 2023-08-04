@@ -2,8 +2,9 @@ import logging
 import os
 
 import torch
-from tqdm import tqdm
 import wandb
+from torch.cuda.amp import GradScaler, autocast
+from tqdm import tqdm
 
 
 def train_model(
@@ -76,6 +77,9 @@ def train_model(
     train_progress = tqdm(total=num_epochs, desc="Training")
     val_progress = tqdm(total=num_epochs, desc="Validation")
 
+    # Create GradScaler instance
+    scaler = GradScaler()
+
     logging.info("Starting model training!")
 
     for epoch in range(num_epochs):
@@ -90,15 +94,18 @@ def train_model(
             images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
 
-            outputs = model(images)
-            if image_size != 256:
-                outputs = torch.nn.functional.interpolate(
-                    outputs, size=256, mode="bilinear"
-                )
+            with autocast():  # Enable autocasting for the forward pass
+                outputs = model(images)
+                if image_size != 256:
+                    outputs = torch.nn.functional.interpolate(
+                        outputs, size=256, mode="bilinear"
+                    )
+                loss = criterion(outputs, labels)
 
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+            # Use the scaler to scale the loss and perform backpropagation
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             train_loss += loss.item()
 
