@@ -151,8 +151,8 @@ def train_model(
         # Log epoch scores (logger and wandb)
         logging.info(
             "Epoch %s/%s completed, "
-            "Train Dice Loss: %s, "
-            "Validation Dice Loss: %s "
+            "Train Dice Loss: %.3f, "
+            "Validation Dice Loss: %.3f "
             "Fold number: %s",
             epoch + 1,
             num_epochs,
@@ -209,4 +209,5 @@ def train_model(
                     os.remove(model_path)
                 model_path = model_epoch_path
 
+    wandb.finish()
     logging.info("Training complete!")

@@ -10,8 +10,7 @@ import segmentation_models_pytorch as smp
 import torch
 import yaml
 from sklearn.model_selection import KFold
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from dataset.dataset import ContrailsDataset
@@ -99,8 +98,11 @@ def main(args):
         )
         df = pd.concat([train_df, valid_df]).reset_index()
 
+        # Take small part of the dataset, if debug
         if config["debug"] == 1:
-            df = df.sample(frac=0.05, random_state=config["seed"])
+            df = df.sample(
+                frac=0.05, random_state=config["seed"], replace=False
+            )
 
         # Get data folds for train and validation
         Fold = KFold(
