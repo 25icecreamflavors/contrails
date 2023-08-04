@@ -46,7 +46,7 @@ def train_model(
     if config["debug"] == 1:
         project_name = "debug_contrails"
     else:
-        project_name = "contrails"
+        project_name = "contrails_corrected"
     wandb.init(
         # Set the project where this run will be logged
         project=project_name,
