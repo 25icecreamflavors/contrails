@@ -81,7 +81,7 @@ def main(args):
         df = get_folds(config, df)
 
         # Train on the selected folds
-        for fold in config["train_folds"]:
+        for i, fold in enumerate(config["train_folds"]):
             logging.info("Started training on - Fold %s", fold)
 
             # Get train and validation dataloaders
@@ -89,6 +89,12 @@ def main(args):
             model = SegModel(config)
 
             if config["synthetic"]["enable"]:
+                if config["synthetic"]["once"] and i > 0:
+                    state_dict = torch.load(
+                        f'./{config["save_path"]}/model_synthetic_once.pth'
+                    )
+                    model.load_state_dict(state_dict)
+
                 bgs_list = get_bgs_list("./bgs/")
                 synthetic_dataloader = get_synthetic_dataloader(config, bgs_list[:-500])
                 synthetic_val_dataloader = get_synthetic_dataloader(
@@ -100,9 +106,15 @@ def main(args):
                     model,
                     synthetic_dataloader,
                     synthetic_val_dataloader,
-                    -fold,
+                    fold=-1,
                     num_epochs=config["synthetic"]["num_epochs"],
                 )
+
+                if config["synthetic"]["once"]:
+                    torch.save(
+                        model.state_dict(),
+                        f'./{config["save_path"]}/model_synthetic_once.pth',
+                    )
 
             train(config, model, train_dataloader, valid_dataloader, fold)
             torch.cuda.empty_cache()

@@ -19,7 +19,7 @@ debug: 1
 
 train_bs: 8
 valid_bs: 128
-workers: 1
+num_workers: 1
 
 num_epochs: 20
 image_size: 384
@@ -35,6 +35,7 @@ early_stop:
 synthetic:
     enable: True
     num_epochs: 20
+    once: True
 
 seg_model: "Unet"
 encoder_name: "timm-efficientnet-b0"
