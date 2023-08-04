@@ -1,0 +1,7 @@
+torch
+numpy
+pandas
+segmentation_models_pytorch
+opencv-python
+scikit-learn
+wandb

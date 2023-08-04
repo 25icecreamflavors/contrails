@@ -11,12 +11,13 @@ folds:
     bins: 20
 
 train_folds: [0, 1, 2, 3]
+fold_strategy: random
     
 seed: 808
 
 debug: 1
 
-train_bs: 64
+train_bs: 8
 valid_bs: 128
 workers: 1
 
