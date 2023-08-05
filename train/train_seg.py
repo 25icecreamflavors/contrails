@@ -106,6 +106,8 @@ def train_model(
                     labels = torch.nn.functional.interpolate(
                         labels, size=256, mode="nearest"
                     )
+                    labels = labels.to(torch.bool).to(torch.uint8)
+                    
 
                 loss = criterion(outputs, labels)
 
@@ -146,6 +148,7 @@ def train_model(
                     labels = torch.nn.functional.interpolate(
                         labels, size=256, mode="nearest"
                     )
+                    labels = labels.to(torch.bool).to(torch.uint8)
 
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()

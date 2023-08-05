@@ -39,7 +39,7 @@ class ContrailsDataset(Dataset):
 
 class SyntheticContrailsDataset(Dataset):
     def __init__(
-        self, images_list, img_size=512, vis_range=(0.7, 0.8), lines_range=(1, 7)
+        self, images_list, img_size=512, vis_range=(0.7, 0.8), lines_range=(4, 7)
     ):
         self.images_list = images_list
         self.img_size = img_size
@@ -110,7 +110,7 @@ class SyntheticContrailsDataset(Dataset):
         img_bg[:, :, :3] = img_bg[:, :, :3] * (
             1 - np.stack([alpha_img] * 3, axis=-1)
         ) + img_bg_trsp[:, :, :3] * (np.stack([alpha_img] * 3, axis=-1))
-
+        img_bg = cv2.cvtColor(img_bg, cv2.COLOR_RGBA2RGB)
         return img_bg
 
     def __len__(self):
@@ -133,6 +133,10 @@ class SyntheticContrailsDataset(Dataset):
             img_size=self.img_size,
             visibility=visibility,
         )
+
+        img = torch.from_numpy(img).permute(2, 0, 1).float()
+        mask = torch.from_numpy(mask).unsqueeze(0).float()
+        mask = mask.to(torch.bool).to(torch.uint8)
 
         img = self.normalize_image(img)
         return img, mask

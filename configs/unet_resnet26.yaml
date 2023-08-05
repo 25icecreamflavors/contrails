@@ -33,7 +33,7 @@ early_stop:
     patience: 999
 
 synthetic:
-    enable: True
+    enable: False
     num_epochs: 20
     once: True
 

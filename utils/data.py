@@ -132,8 +132,9 @@ def get_synthetic_dataloader(config, bgs_list):
 
 def get_bgs_list(path_dir, extension=".jpg"):
     bgs_list = []
-    for path_file in os.listdir(path_dir):
-        if path_file.endswith(extension):
-            bgs_list.append(os.path.join(path_dir, path_file))
+    for path, subdirs, files in os.walk(path_dir):
+        for name in files:
+            if name.endswith(extension):
+                bgs_list.append(os.path.join(path, name))
     bgs_list = sorted(bgs_list)
     return bgs_list
