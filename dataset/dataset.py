@@ -23,8 +23,8 @@ class ContrailsDataset(Dataset):
         sample = np.load(str(sample_path))
 
         item = {
-            "image": sample[..., :-1],
-            "mask": sample[..., -1],
+            "image": sample[..., :-1].astype(np.float32),
+            "mask": sample[..., -1].astype(np.float32),
         }
 
         if self.transforms is not None:
