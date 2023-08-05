@@ -5,3 +5,4 @@ segmentation_models_pytorch
 opencv-python
 scikit-learn
 wandb
+albumentations

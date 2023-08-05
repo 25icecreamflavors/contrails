@@ -4,6 +4,7 @@ from sklearn.model_selection import KFold, StratifiedKFold
 
 from torch.utils.data import DataLoader
 from dataset.dataset import ContrailsDataset, SyntheticContrailsDataset
+from dataset.transforms import get_transforms, AUGMENTATIONS_TRAIN
 
 
 def get_dataframes(config):
@@ -80,12 +81,22 @@ def get_fold_dataloaders(config, df, fold):
     train_df = df[df.kfold != fold].reset_index(drop=True)
     valid_df = df[df.kfold == fold].reset_index(drop=True)
 
+    if config["augmentations"]["enable"]:
+        augs = AUGMENTATIONS_TRAIN[config["augmentations"]["set"]]
+    else:
+        augs = None
+    transforms = get_transforms(config["image_size"], augs)
+
     # Create an instance of the ContrailsDataset class
     train_dataset = ContrailsDataset(
-        train_df, image_size=config["image_size"], train=True
+        train_df,
+        train=True,
+        transforms=transforms,
     )
     valid_dataset = ContrailsDataset(
-        valid_df, image_size=config["image_size"], train=False
+        valid_df,
+        train=False,
+        transforms=transforms,
     )
     # Get dataloaders
     train_dataloader = DataLoader(

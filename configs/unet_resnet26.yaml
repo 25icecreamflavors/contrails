@@ -37,6 +37,10 @@ synthetic:
     num_epochs: 20
     once: True
 
+augmentations:
+    enable: True
+    set: 3
+
 seg_model: "Unet"
 encoder_name: "timm-efficientnet-b0"
 

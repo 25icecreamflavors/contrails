@@ -139,6 +139,10 @@ def train_model(
                     outputs = torch.nn.functional.interpolate(
                         outputs, size=256, mode="bilinear"
                     )
+                    labels = torch.nn.functional.interpolate(
+                        labels, size=256, mode="bilinear"
+                    )
+
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()
 
