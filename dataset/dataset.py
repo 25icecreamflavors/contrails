@@ -29,6 +29,7 @@ class ContrailsDataset(Dataset):
 
         if self.transforms is not None:
             item = self.transforms(**item)
+        item["mask"] = item["mask"].unsqueeze(0)
 
         return item["image"], item["mask"]
 
