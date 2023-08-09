@@ -43,7 +43,7 @@ class ContrailsDataset(Dataset):
 
         img = self.normalize_image(img)
 
-        if train == True:
+        if self.train == True:
             label = sample[..., -1]
             label = torch.tensor(label)
 

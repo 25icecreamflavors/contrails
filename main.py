@@ -239,14 +239,6 @@ def main(args):
                 num_workers=config["num_workers"],
             )
 
-            # Create a CosineAnnealingLR scheduler
-            if config["scheduler"]["use"] == 1:
-                scheduler = CosineAnnealingLR(
-                    optimizer, T_max=config["num_epochs"]
-                )
-            else:
-                scheduler = None
-
             # Get utils for segment model training
             if config["train_class"] == False:
                 # Instantiate the SegModel and optimizer
@@ -254,6 +246,15 @@ def main(args):
                 optimizer = torch.optim.Adam(
                     model.parameters(), lr=config["optimizer_params"]["lr"]
                 )
+
+                # Create a CosineAnnealingLR scheduler
+                if config["scheduler"]["use"] == 1:
+                    scheduler = CosineAnnealingLR(
+                        optimizer, T_max=config["num_epochs"]
+                    )
+                else:
+                    scheduler = None
+
                 # Instantiate the DiceLoss
                 dice_loss = smp.losses.DiceLoss(
                     mode="binary",
@@ -283,6 +284,14 @@ def main(args):
                 optimizer = torch.optim.Adam(
                     model.parameters(), lr=config["optimizer_params"]["lr"]
                 )
+
+                # Create a CosineAnnealingLR scheduler
+                if config["scheduler"]["use"] == 1:
+                    scheduler = CosineAnnealingLR(
+                        optimizer, T_max=config["num_epochs"]
+                    )
+                else:
+                    scheduler = None
 
                 train_class_model(
                     model,
