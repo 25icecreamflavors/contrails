@@ -32,10 +32,6 @@ class ContrailsDataset(Dataset):
         sample = np.load(str(sample_path))
 
         img = sample[..., :-1]
-        label = sample[..., -1]
-
-        label = torch.tensor(label)
-
         img = (
             torch.tensor(np.reshape(img, (256, 256, 3)))
             .to(torch.float32)
@@ -47,7 +43,15 @@ class ContrailsDataset(Dataset):
 
         img = self.normalize_image(img)
 
-        return img.float(), label.float()
+        if train == True:
+            label = sample[..., -1]
+            label = torch.tensor(label)
+
+            return img.float(), label.float()
+
+        else:
+            label = row.mask_size
+            return img.float(), label.float()
 
     def __len__(self):
         return len(self.df)

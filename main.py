@@ -8,13 +8,15 @@ import numpy as np
 import pandas as pd
 import segmentation_models_pytorch as smp
 import torch
+import torch.nn as nn
 import yaml
 from sklearn.model_selection import KFold, StratifiedKFold
 from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from dataset.dataset import ContrailsDataset
-from models.segment_model import SegModel
+from models.segment_model import ClassificationModel, SegModel
+from train.train_class import train_class_model
 from train.train_seg import train_model
 
 
@@ -84,8 +86,8 @@ def main(args):
     if mode == "train":
         # Get data paths
         contrails = os.path.join(config["data_path"], "contrails/")
-        train_path = os.path.join(config["data_path"], "train_df.csv")
-        valid_path = os.path.join(config["data_path"], "valid_df.csv")
+        train_path = os.path.join(config["data_path"], "train_size.csv")
+        valid_path = os.path.join(config["data_path"], "valid_size.csv")
 
         # Read dataframes with contrails id
         train_df = pd.read_csv(train_path)
@@ -150,22 +152,79 @@ def main(args):
 
             # Drop the temporary "mask_size_bin" column
             df.drop(columns=["mask_size_bin"], inplace=True)
+
+            # Get labels for empty masks
+            if config["add_pseudo"] != True:
+                df.loc[df["mask_size"] != 0, "mask_size"] = 1
+                logging.info("Added masks labels.")
+
             # Convert the fold column to integer
             df["kfold"] = df["kfold"].astype(int)
+
+        if config["add_pseudo"] == True:
+            dfs = []
+
+            for i in config["frames_list"]:
+                train_path2 = os.path.join(
+                    config["data_path"], f"train_ph{i}.csv"
+                )
+                val_path2 = os.path.join(
+                    config["data_path"], f"valid_ph{i}.csv"
+                )
+
+                temp_df = pd.read_csv(train_path2)
+                dfs.append(temp_df)
+                temp_df = pd.read_csv(val_path2)
+                dfs.append(temp_df)
+
+            pseudo_df = pd.concat(dfs).reset_index()
+
+            logging.info("Added concatenated frames_df. :D")
+
+            pseudo_df = pseudo_df.merge(
+                df[["record_id", "kfold"]],
+                left_on="id",
+                right_on="record_id",
+            )
+            pseudo_df = pseudo_df.rename(columns={"record_id_x": "record_id"})
+            pseudo_df = pseudo_df.drop(columns=["record_id_y", "index"])
 
         # Train on the selected folds
         for fold in config["train_folds"]:
             logging.info("Started training on - Fold %s", fold)
-            train_df = df[df.kfold != fold].reset_index(drop=True)
+
+            # Add pseudo labels frames dataset
+            if config["add_pseudo"] == True:
+                train_df = df[df.kfold != fold].reset_index(drop=True)
+                train_pseudo = pseudo_df[pseudo_df.kfold != fold].reset_index(
+                    drop=True
+                )
+                train_df = pd.concat([train_df, train_pseudo]).reset_index(
+                    drop=True
+                )
+                logging.info("Concatenated train and pseudo frames datasets.")
+
+            else:
+                train_df = df[df.kfold != fold].reset_index(drop=True)
             valid_df = df[df.kfold == fold].reset_index(drop=True)
 
-            # Create an instance of the ContrailsDataset class
-            train_dataset = ContrailsDataset(
-                train_df, image_size=config["image_size"], train=True
-            )
-            valid_dataset = ContrailsDataset(
-                valid_df, image_size=config["image_size"], train=False
-            )
+            if config["train_class"] == False:
+                # Create an instance of the ContrailsDataset class
+                train_dataset = ContrailsDataset(
+                    train_df, image_size=config["image_size"], train=True
+                )
+                valid_dataset = ContrailsDataset(
+                    valid_df, image_size=config["image_size"], train=True
+                )
+            else:
+                # Create a dataset for classification training
+                train_dataset = ContrailsDataset(
+                    train_df, image_size=config["image_size"], train=False
+                )
+                valid_dataset = ContrailsDataset(
+                    valid_df, image_size=config["image_size"], train=False
+                )
+
             # Get dataloaders
             train_dataloader = DataLoader(
                 train_dataset,
@@ -180,31 +239,61 @@ def main(args):
                 num_workers=config["num_workers"],
             )
 
-            # Instantiate the SegModel and optimizer
-            model = SegModel(config)
-            optimizer = torch.optim.Adam(
-                model.parameters(), lr=config["optimizer_params"]["lr"]
-            )
-
             # Create a CosineAnnealingLR scheduler
-            scheduler = CosineAnnealingLR(optimizer, T_max=config["num_epochs"])
+            if config["scheduler"]["use"] == 1:
+                scheduler = CosineAnnealingLR(
+                    optimizer, T_max=config["num_epochs"]
+                )
+            else:
+                scheduler = None
 
-            # Instantiate the DiceLoss
-            dice_loss = smp.losses.DiceLoss(
-                mode="binary", from_logits=True, smooth=config["loss_smooth"]
-            )
+            # Get utils for segment model training
+            if config["train_class"] == False:
+                # Instantiate the SegModel and optimizer
+                model = SegModel(config)
+                optimizer = torch.optim.Adam(
+                    model.parameters(), lr=config["optimizer_params"]["lr"]
+                )
+                # Instantiate the DiceLoss
+                dice_loss = smp.losses.DiceLoss(
+                    mode="binary",
+                    from_logits=True,
+                    smooth=config["loss_smooth"],
+                )
 
-            # Train the model
-            train_model(
-                model,
-                train_dataloader,
-                valid_dataloader,
-                criterion=dice_loss,
-                optimizer=optimizer,
-                config=config,
-                fold=fold,
-                scheduler=scheduler,
-            )
+                train_model(
+                    model,
+                    train_dataloader,
+                    valid_dataloader,
+                    criterion=dice_loss,
+                    optimizer=optimizer,
+                    config=config,
+                    fold=fold,
+                    scheduler=scheduler,
+                )
+
+            # Get utils for a classifier training
+            else:
+                # Instantiate the ClassifierModel and optimizer
+                model = ClassificationModel(config)
+
+                # Instantiate BCEWithLogitsLoss and Adam optimizer
+                # BCEWithLogitsLoss combines sigmoid and BCE
+                bce_loss = nn.BCEWithLogitsLoss()
+                optimizer = torch.optim.Adam(
+                    model.parameters(), lr=config["optimizer_params"]["lr"]
+                )
+
+                train_class_model(
+                    model,
+                    train_dataloader,
+                    valid_dataloader,
+                    criterion=bce_loss,
+                    optimizer=optimizer,
+                    config=config,
+                    fold=fold,
+                    scheduler=scheduler,
+                )
 
             # Clear GPU memory
             del model

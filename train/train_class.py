@@ -3,11 +3,10 @@ import os
 
 import torch
 import wandb
-from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 
 
-def train_model(
+def train_class_model(
     model,
     train_loader,
     val_loader,
@@ -47,7 +46,7 @@ def train_model(
     if config["debug"] == 1:
         project_name = "debug_contrails"
     else:
-        project_name = "contrails_corrected"
+        project_name = "contrails_classification"
     wandb.init(
         # Set the project where this run will be logged
         project=project_name,
@@ -67,7 +66,9 @@ def train_model(
 
     # Send model to GPU, set up validation score
     model.to(device)
-    best_val_loss = 100
+
+    # Initialize best validation accuracy
+    best_val_acc = 0.0
 
     # Initialize model_path variable for saving the best model
     # Will be used to delete older models
@@ -82,6 +83,8 @@ def train_model(
     for epoch in range(num_epochs):
         model.train()
         train_loss = 0.0
+        correct_predictions = 0  # Counter for correct predictions
+        total_samples = 0  # Counter for total samples
 
         # Train epoch
         train_batch_progress = tqdm(
@@ -92,26 +95,32 @@ def train_model(
             optimizer.zero_grad()
 
             outputs = model(images)
-            if image_size != 256:
-                outputs = torch.nn.functional.interpolate(
-                    outputs, size=256, mode="bilinear"
-                )
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
             train_loss += loss.item()
 
+            probabilities = torch.sigmoid(outputs)
+            predicted = (probabilities >= 0.5).float()
+
+            probabilities = torch.sigmoid(outputs)
+            predicted = (probabilities >= 0.5).float()
+            correct_predictions += (predicted == labels).sum().item()
+            total_samples += labels.size(0)
+
             # Update training batch progress bar with dice loss
             train_batch_progress.set_postfix(
-                {"Train Dice Loss": train_loss / (batch_idx + 1)}
+                {
+                    "Train BCE Loss": train_loss / (batch_idx + 1),
+                    "Train Accuracy": correct_predictions / total_samples,
+                }
             )
             train_batch_progress.update(1)
 
+        train_acc = correct_predictions / total_samples
+
         # Update training epoch progress bar with average dice loss
-        train_progress.set_postfix(
-            {"Train Dice Loss": train_loss / len(train_loader)}
-        )
         train_progress.update(1)
         train_batch_progress.close()
 
@@ -122,49 +131,61 @@ def train_model(
         # Validation epoch
         model.eval()
         val_loss = 0.0
+        correct_predictions = 0
+        total_samples = 0
         with torch.no_grad():
             val_batch_progress = tqdm(val_loader, desc="Validation")
             for batch_idx, (images, labels) in enumerate(val_batch_progress):
                 images, labels = images.to(device), labels.to(device)
                 outputs = model(images)
-                if image_size != 256:
-                    outputs = torch.nn.functional.interpolate(
-                        outputs, size=256, mode="bilinear"
-                    )
-                loss = criterion(outputs, labels)
+
+                logits = model(images)
+                probabilities = torch.sigmoid(logits)
+                predicted = (probabilities >= 0.5).float()
+                correct_predictions += (predicted == labels).sum().item()
+                total_samples += labels.size(0)
+
+                loss = criterion(logits, labels)
                 val_loss += loss.item()
 
                 # Update validation batch progress bar with dice loss
                 val_batch_progress.set_postfix(
-                    {"Validation Dice Loss": val_loss / (batch_idx + 1)}
+                    {"Validation BCE Loss": val_loss / (batch_idx + 1)}
                 )
                 val_batch_progress.update(1)
 
         val_loss /= len(val_loader)
         train_loss /= len(train_loader)
+        val_acc = correct_predictions / total_samples
 
         # Update validation progress bar with average dice loss
-        val_progress.set_postfix({"Validation Dice Loss": val_loss})
+        # val_progress.set_postfix({"Validation BCE Loss": val_loss})
         val_progress.update(1)
         val_batch_progress.close()
 
         # Log epoch scores (logger and wandb)
         logging.info(
             "Epoch %s/%s completed, "
-            "Train Dice Loss: %.3f, "
-            "Validation Dice Loss: %.3f "
+            "Train BCE Loss: %.3f, "
+            "Validation BCE Loss: %.3f, "
+            "Train Accuracy: %.3f "
+            "Validation Accuracy: %.3f "
             "Fold number: %s",
             epoch + 1,
             num_epochs,
             train_loss,
             val_loss,
+            train_acc,
+            val_acc,
             fold,
         )
         wandb.log(
             {
                 "Epoch": epoch,
-                "Train Dice Loss": train_loss,
-                "Validation Dice Loss": val_loss,
+                "Train BCE Loss": train_loss,
+                "Validation BCE Loss": val_loss,
+                "Train Accuracy": train_acc,
+                "Validation Accuracy": val_acc,
             }
         )
 
@@ -175,7 +196,7 @@ def train_model(
             if (epoch + 1) % save_period == 0:
                 model_name = (
                     f"model_{config['name']}_fold_{fold}_"
-                    f"epoch_{epoch + 1}_val_loss_{val_loss:.3f}.pth"
+                    f"epoch_{epoch + 1}_val_acc_{val_acc:.3f}.pth"
                 )
 
                 # Get full model path and save the model
@@ -188,12 +209,12 @@ def train_model(
 
         # Saving the best model only
         else:
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
 
                 model_name = (
                     f"best_model_{config['name']}_"
-                    f"fold_{fold}_epoch_{epoch + 1}_val_loss_{val_loss:.3f}.pth"
+                    f"fold_{fold}_epoch_{epoch + 1}_val_acc_{val_acc:.3f}.pth"
                 )
 
                 # Get full model path and save the model
